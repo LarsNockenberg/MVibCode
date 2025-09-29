@@ -14,8 +14,8 @@ L. Nockenberg, A. Noll, S. Panëels, A. B. Dhiab, C. Hudin and E. Steinbach,
 in IEEE Transactions on Haptics, vol. 16, no. 4, pp. 646-651, Oct.-Dec. 2023, doi: 10.1109/TOH.2023.3276420.
 
 Bibtex:
-
-@ARTICLE{10125055,
+```
+@ARTICLE{nockenberg2023mvibcode,
   author={Nockenberg, Lars and Noll, Andreas and Panëels, Sabrina and Dhiab, Ayoub Ben and Hudin, Charles and Steinbach, Eckehard},
   journal={IEEE Transactions on Haptics}, 
   title={MVibCode: Multi-Channel Vibrotactile Codec Using Hierarchical Perceptual Clustering}, 
@@ -24,7 +24,9 @@ Bibtex:
   number={4},
   pages={646-651},
   keywords={Codecs;Encoding;Measurement;Decoding;Quantization (signal);Redundancy;Clustering algorithms;Computers and information processing;haptic interfaces;tactile internet computers and information processing;data compression;source coding professional communication;information systems;data compression},
-  doi={10.1109/TOH.2023.3276420}}
+  doi={10.1109/TOH.2023.3276420}
+}
+```
 
 Authors: Lars Nockenberg, Andreas Noll
 (c) 2023. This work is licensed under a CC BY-NC 3.0 license.
