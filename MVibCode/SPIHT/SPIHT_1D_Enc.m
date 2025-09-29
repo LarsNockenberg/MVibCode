@@ -1,0 +1,157 @@
+function [out,context] = SPIHT_1D_Enc(m, level, bitwavmax, maxallocbits,settings)
+%External library, modified for use case. Original:
+%Kanchi (2024). SPIHT (https://www.mathworks.com/matlabcentral/fileexchange/4808-spiht), MATLAB Central File Exchange. Visited 16th of Juli 2024. 
+%SPIHT-encoder with additional output of context indication for arithmetic
+%coding
+
+
+%-----------   Initialization  -----------------
+%n_max = floor(log2(max(abs(m))'));
+n_max = maxallocbits;
+maxallocbits_size = settings.maxallocbits_size;
+%-----------   output bitstream header   ----------------
+% sequence size, number of bit plane, wavelet decomposition level should be
+% written as bit stream header.
+bitn = de2bi(n_max,maxallocbits_size);
+hlength = length(bitn);
+
+out = zeros(1,20000); %preallocation; if its too short, method gets slower, but works
+out(1,1:hlength) = bitn;
+out(hlength+1:hlength+1+length(bitwavmax)-1) = bitwavmax;
+out_index = hlength+length(bitwavmax)+1;
+
+context = zeros(1,20000); %preallocation; if its too short, method gets slower, but works
+context(1,1:out_index-1) = 0;
+
+%-----------   Initialize LIP, LSP, LIS   ----------------
+bandsize = 2.^(log2(size(m, 2)) - level + 1);
+temp = 1 : bandsize;
+LIP(:, 1) = ones(bandsize,1);
+LIP(:, 2) = temp';
+
+LIS(:, 1) = LIP(bandsize/2+1:end, 1);
+LIS(:, 2) = LIP(bandsize/2+1:end, 2);
+LIS(:, 3) = zeros(length(LIP(bandsize/2+1:end, 1)), 1);
+LSP = [];
+
+n = n_max;
+
+max_d_all = max_Descendant2(m);
+
+%-----------   coding   ----------------
+while(0 <= n) % loop over bitplanes
+
+    LSP_idx = size(LSP,1); % to be used in refinement pass
+    % Sorting Pass
+    LIPtemp = LIP; temp = 0;
+    for i = 1:size(LIPtemp,1)
+        temp = temp+1;
+        if abs(m(LIPtemp(i,1),LIPtemp(i,2))) >= 2^n % 1: positive; 0: negative
+            %[out,out_index,context] = addToOutput(out,out_index,1,context,2);
+            addToOutput(1,2);
+            sgn = m(LIPtemp(i,1),LIPtemp(i,2))>=0;
+            %[out,out_index,context] = addToOutput(out,out_index,sgn,context,1);
+            addToOutput(sgn,1);
+            LSP = [LSP; LIPtemp(i,:)];
+            LIP(temp,:) = []; temp = temp - 1;
+        else
+            %[out,out_index,context] = addToOutput(out,out_index,0,context,2);
+            addToOutput(0,2);
+        end
+    end
+
+    LIStemp = LIS; temp = 0; i = 1;
+    while ( i <= size(LIStemp,1))
+        temp = temp + 1;
+        % If type A
+        if LIStemp(i,3) == 0 
+            %max_d = max_Descendant(LIStemp(i,1),LIStemp(i,2),LIStemp(i,3),m);
+            max_d = max_d_all(LIStemp(i,3)+1,LIStemp(i,2));
+%             if(max_d ~= max_d2)
+%                 disp('error');
+%             end
+            if max_d >= 2^n
+                %[out,out_index,context] = addToOutput(out,out_index,1,context,3);
+                addToOutput(1,3);
+                x = LIStemp(i,1); y = LIStemp(i,2);
+                % Childeren
+                if abs(m(x,2*y-1)) >= 2^n
+                    LSP = [LSP; x 2*y-1];
+                    %[out,out_index,context] = addToOutput(out,out_index,1,context,4);
+                    addToOutput(1,4);
+                    sgn = m(x,2*y-1)>=0;
+                    %[out,out_index,context] = addToOutput(out,out_index,sgn,context,1);
+                    addToOutput(sgn,1);
+                else
+                    %[out,out_index,context] = addToOutput(out,out_index,0,context,4);
+                    addToOutput(0,4);
+                    LIP = [LIP; x 2*y-1];
+                end
+                if abs(m(x,2*y)) >= 2^n
+                    LSP = [LSP; x 2*y];
+                    %[out,out_index,context] = addToOutput(out,out_index,1,context,4);
+                    addToOutput(1,4);
+                    sgn = m(x,2*y)>=0;
+                    %[out,out_index,context] = addToOutput(out,out_index,sgn,context,1);
+                    addToOutput(sgn,1);
+                else
+                    %[out,out_index,context] = addToOutput(out,out_index,0,context,4);
+                    addToOutput(0,4);
+
+                    LIP = [LIP; x 2*y];
+                end     
+                % If there exist Grandchilderen
+                if ((2*(2*y)-1) < size(m,2))
+                    LIS = [LIS; LIStemp(i,1) LIStemp(i,2) 1];  % change it to type B and append to the list
+                    LIStemp = [LIStemp; LIStemp(i,1) LIStemp(i,2) 1]; % change it to type B and append to the list
+                end
+                LIS(temp,:) = []; temp = temp-1;
+                
+            else
+                %[out,out_index,context] = addToOutput(out,out_index,0,context,3);
+                addToOutput(0,3);
+            end
+        % If type B
+        else
+            %max_d = max_Descendant(LIStemp(i,1),LIStemp(i,2),LIStemp(i,3),m);
+            max_d = max_d_all(LIStemp(i,3)+1,LIStemp(i,2));
+            if max_d >= 2^n
+                %[out,out_index,context] = addToOutput(out,out_index,1,context,5); 
+                addToOutput(1,5);
+                x = LIStemp(i,1); y = LIStemp(i,2);
+                LIS = [LIS; x 2*y-1 0; x 2*y 0];
+                LIStemp = [LIStemp; x 2*y-1 0; x 2*y 0];
+                LIS(temp,:) = []; temp = temp - 1;
+            else
+                %[out,out_index,context] = addToOutput(out,out_index,0,context,5);
+                addToOutput(0,5);
+            end
+        end
+        i = i+1;
+    end
+    
+    
+   
+    % Refinement Pass
+    temp = 1;
+    while (temp<=LSP_idx)
+       s = bitget(floor(abs(m(LSP(temp,1),LSP(temp,2)))),n+1);
+       %[out,out_index,context] = addToOutput(out,out_index,s,context,6);
+       addToOutput(s,6); 
+       temp = temp + 1;
+    end
+
+    n = n - 1;
+end
+
+out = out(1:out_index-1);
+context = context(1:out_index-1);
+
+%function for faster addition of data to output
+function addToOutput(val,c)
+    out(out_index) = val;
+    context(out_index) = c;
+    out_index = out_index+1;
+end
+
+end
